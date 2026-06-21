@@ -177,23 +177,57 @@ body {
 }
 
 /* Light theme overrides */
+.light,
+html.light {
+  /* Invert the surface colors for light mode */
+  --color-surface-50: oklch(0.12 0.005 285);      /* Darkest (headings) */
+  --color-surface-100: oklch(0.16 0.005 285);
+  --color-surface-200: oklch(0.20 0.005 285);      /* Dark gray (body text) */
+  --color-surface-300: oklch(0.27 0.005 285);      /* Medium dark gray (nav links) */
+  --color-surface-400: oklch(0.42 0.005 285);      /* Subtitles/labels */
+  --color-surface-500: oklch(0.55 0.00 0);
+  --color-surface-600: oklch(0.68 0.005 285);
+  --color-surface-700: oklch(0.80 0.005 285);
+  --color-surface-800: oklch(0.88 0.005 285);      /* Light gray (active hover bg / borders) */
+  --color-surface-900: oklch(0.94 0.005 285);      /* Very light gray (dropdown bg) */
+  --color-surface-950: oklch(0.98 0.005 285);      /* Lightest (page background) */
+
+  /* Invert glow and glass colors too */
+  --color-glow-purple: oklch(0.58 0.22 285 / 0.12);
+  --color-glow-blue: oklch(0.58 0.20 250 / 0.12);
+  --color-glow-soft: oklch(0.58 0.22 285 / 0.05);
+}
+
 .light body,
 html.light body {
-  background-color: oklch(0.98 0.005 285);
-  color: var(--color-surface-900);
+  background-color: var(--color-surface-950);
+  color: var(--color-surface-200);
 }
 
 .light .glass,
 html.light .glass {
-  background: oklch(1 0 0 / 0.7);
+  background: oklch(1 0 0 / 0.75);
   border-color: oklch(0 0 0 / 0.08);
+  box-shadow: 0 8px 32px 0 oklch(0 0 0 / 0.03);
+}
+
+.light .glass-light,
+html.light .glass-light {
+  background: oklch(1 0 0 / 0.45);
+  border-color: oklch(0 0 0 / 0.06);
+}
+
+.light .glass-strong,
+html.light .glass-strong {
+  background: oklch(1 0 0 / 0.95);
+  border-color: oklch(0 0 0 / 0.12);
 }
 
 .light .gradient-bg,
 html.light .gradient-bg {
-  background: radial-gradient(ellipse at 20% 50%, oklch(0.90 0.04 285 / 0.5) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 20%, oklch(0.90 0.04 250 / 0.4) 0%, transparent 50%),
-              oklch(0.98 0.005 285);
+  background: radial-gradient(ellipse at 20% 50%, oklch(0.90 0.04 285 / 0.4) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, oklch(0.90 0.04 250 / 0.3) 0%, transparent 50%),
+              var(--color-surface-950);
 }
 
 /* Skeleton loading */
