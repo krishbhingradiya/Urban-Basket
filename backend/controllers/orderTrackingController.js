@@ -5,6 +5,7 @@ import {
   statusToTrackingStep,
 } from "../services/orderTrackingService.js"
 import { applyReturnedOverlay, getReturnedOrderIdSet } from "../services/orderReturnService.js"
+import { enrichOrderPaymentInfo } from "./orderController.js"
 
 async function assertOrderAccess(order, user) {
   if (order.user_id === user.id) return true
@@ -60,17 +61,18 @@ export const getOrderTracking = async (req, res, next) => {
 
     const returnedIds = await getReturnedOrderIdSet().catch(() => new Set())
     const enriched = applyReturnedOverlay(order, returnedIds)
+    const withPayment = enrichOrderPaymentInfo(enriched)
 
     const estimated =
-      enriched.estimated_delivery ||
-      computeEstimatedDelivery(enriched.created_at, enriched.id)
+      withPayment.estimated_delivery ||
+      computeEstimatedDelivery(withPayment.created_at, withPayment.id)
 
     const history = await getTrackingHistory(id)
 
     return res.status(200).json({
       order: {
-        ...enriched,
-        tracking_step: enriched.tracking_step ?? statusToTrackingStep(enriched.status),
+        ...withPayment,
+        tracking_step: withPayment.tracking_step ?? statusToTrackingStep(withPayment.status),
         estimated_delivery: estimated,
       },
       history,

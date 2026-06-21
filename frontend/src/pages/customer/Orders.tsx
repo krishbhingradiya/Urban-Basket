@@ -98,7 +98,7 @@ function mapApiOrder(order: OrderWithItems): Order {
     deliveredAt: order.delivered_at || null,
     estimatedDelivery: order.estimated_delivery || null,
     paymentMethod: PAYMENT_METHOD_LABELS[method] || method,
-    paymentStatus: method === "cod" && payStatus === "pending" ? "COD" : payStatus,
+    paymentStatus: payStatus === "pending" || (method === "cod" && payStatus !== "paid" && status !== "delivered") ? "Pending" : "Paid",
     shippingAddress:
       order.shipping_address && typeof order.shipping_address === "object"
         ? (order.shipping_address as ShippingAddressLike)
@@ -300,7 +300,7 @@ export default function Orders() {
                               className={`font-semibold uppercase ${
                                 order.paymentStatus.toLowerCase() === "paid"
                                   ? "text-green-400"
-                                  : order.paymentStatus === "COD"
+                                  : order.paymentStatus.toLowerCase() === "pending"
                                   ? "text-amber-400"
                                   : "text-surface-300"
                               }`}

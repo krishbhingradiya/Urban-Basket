@@ -194,12 +194,12 @@ export const createOrder = async (req, res, next) => {
 
     await seedInitialTrackingHistory(order.id, "pending", userId).catch(() => {})
 
-    return res.status(201).json({
+    return res.status(201).json(enrichOrderPaymentInfo({
       ...order,
       payment_method: order.payment_method || payment_method,
       payment_status: order.payment_status || payment_status,
       transaction_id: order.transaction_id || resolvedTransactionId,
-    })
+    }))
   } catch (err) {
     next(err)
   }
@@ -231,7 +231,10 @@ export const getUserOrders = async (req, res, next) => {
     }
 
     const returnedIds = await getReturnedOrderIdSet().catch(() => new Set())
-    const enriched = (orders || []).map((o) => applyReturnedOverlay(o, returnedIds))
+    const enriched = (orders || []).map((o) => {
+      const withReturn = applyReturnedOverlay(o, returnedIds)
+      return enrichOrderPaymentInfo(withReturn)
+    })
 
     return res.status(200).json(enriched)
   } catch (err) {
@@ -556,3 +559,39 @@ export const getPendingReviewItems = async (req, res, next) => {
     next(err)
   }
 }
+
+export function enrichOrderPaymentInfo(order) {
+  if (!order) return order
+
+  let method = order.payment_method
+  if (!method && order.transaction_id) {
+    if (order.transaction_id.startsWith("COD_")) {
+      method = "cod"
+    } else if (order.transaction_id.startsWith("WALLET_")) {
+      method = "wallet"
+    } else if (order.transaction_id.startsWith("GPAY_") || order.transaction_id.includes("GPAY")) {
+      method = "gpay"
+    } else if (order.transaction_id.startsWith("UPI_") || order.transaction_id.includes("UPI")) {
+      method = "upi"
+    } else {
+      method = "card"
+    }
+  }
+  if (!method) method = "card"
+
+  let payStatus = order.payment_status
+  if (!payStatus) {
+    if (method === "cod") {
+      payStatus = order.status === "delivered" ? "paid" : "pending"
+    } else {
+      payStatus = "paid"
+    }
+  }
+
+  return {
+    ...order,
+    payment_method: method,
+    payment_status: payStatus,
+  }
+}
+
