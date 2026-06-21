@@ -34,7 +34,12 @@ function formatOrderDate(date: string | undefined) {
   }
 }
 
-function normalizeSellerOrder(raw: Partial<SellerOrder>): SellerOrder {
+interface ExtendedSellerOrder extends SellerOrder {
+  payment_method?: string
+  payment_status?: string
+}
+
+function normalizeSellerOrder(raw: Partial<ExtendedSellerOrder>): ExtendedSellerOrder {
   return {
     id: String(raw.id ?? ""),
     customer: String(raw.customer ?? "Customer"),
@@ -43,11 +48,13 @@ function normalizeSellerOrder(raw: Partial<SellerOrder>): SellerOrder {
     total: Number(raw.total) || 0,
     status: normalizeStatus(String(raw.status ?? "pending")),
     date: String(raw.date ?? new Date().toISOString()),
+    payment_method: raw.payment_method,
+    payment_status: raw.payment_status,
   }
 }
 
 export default function SellerOrders() {
-  const [orders, setOrders] = useState<SellerOrder[]>([])
+  const [orders, setOrders] = useState<ExtendedSellerOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -178,6 +185,7 @@ export default function SellerOrders() {
                   <th className="py-4 pl-4">Order ID</th>
                   <th className="py-4">Customer</th>
                   <th className="py-4">Items Summary</th>
+                  <th className="py-4">Payment</th>
                   <th className="py-4">Total</th>
                   <th className="py-4">Date</th>
                   <th className="py-4 pr-4 text-right">Status Selector</th>
@@ -198,6 +206,20 @@ export default function SellerOrders() {
                       </td>
                       <td className="py-3.5 text-surface-350 pr-4 max-w-xs truncate" title={ord.items}>
                         {ord.items || "—"}
+                      </td>
+                      <td className="py-3.5">
+                        <p className="font-semibold text-surface-200">
+                          {ord.payment_method === "COD" ? "Cash on Delivery" :
+                           ord.payment_method === "Wallet" ? "Urban Basket Wallet" :
+                           ord.payment_method || "—"}
+                        </p>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                          ord.payment_status?.toLowerCase() === "paid"
+                            ? "text-green-400 bg-green-400/10 border border-green-500/20"
+                            : "text-amber-400 bg-amber-400/10 border border-amber-500/20"
+                        }`}>
+                          {ord.payment_status === "Pending" ? "Payment Pending" : ord.payment_status || "Pending"}
+                        </span>
                       </td>
                       <td className="py-3.5 font-semibold text-primary-400">{formatCurrency(ord.total)}</td>
                       <td className="py-3.5 text-surface-450">{formatOrderDate(ord.date)}</td>

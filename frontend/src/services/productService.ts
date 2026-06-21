@@ -101,7 +101,25 @@ export async function deleteProduct(id: string) {
   return apiDelete<{ message: string }>(`/products/${id}`)
 }
 
+export interface PaymentStats {
+  totalPaidOrders: number
+  totalPendingPayments: number
+  revenueFromPaidOrders: number
+  codOrdersCount: number
+  upiOrdersCount: number
+  cardOrdersCount: number
+  walletOrdersCount: number
+}
+
+export interface SellerStats {
+  totalRevenue: number
+  totalOrders: number
+  totalProducts: number
+  lowStock: number
+  paymentStats?: PaymentStats
+}
+
 export async function getSellerStats(sellerId: string) {
   // GET /stats/seller (ignores parameter since backend uses req.user.id securely)
-  return apiGet<{ totalRevenue: number; totalOrders: number; totalProducts: number; lowStock: number }>("/stats/seller")
+  return apiGet<SellerStats>("/stats/seller")
 }

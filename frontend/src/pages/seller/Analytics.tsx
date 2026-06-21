@@ -1,10 +1,12 @@
+import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, LineChart, Line } from "recharts"
-import { DollarSign, Award, Percent, ShoppingBag, ArrowUpRight, TrendingUp } from "lucide-react"
+import { DollarSign, Award, Percent, ShoppingBag, ArrowUpRight, TrendingUp, CreditCard, ShieldAlert, CheckCircle } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
+import { getSellerStats, type SellerStats } from "@/services/productService"
 
 const stats = [
-  { label: "Avg. Order Value", value: "$205.15", change: "+4.2%", isPositive: true, icon: DollarSign },
+  { label: "Avg. Order Value", value: "₹205.15", change: "+4.2%", isPositive: true, icon: DollarSign },
   { label: "Conversion Rate", value: "3.4%", change: "+0.8%", isPositive: true, icon: Percent },
   { label: "Return Rate", value: "1.2%", change: "-0.5%", isPositive: false, icon: Award },
   { label: "Satisfaction", value: "4.8 / 5", change: "+0.1", isPositive: true, icon: ShoppingBag }
@@ -43,6 +45,40 @@ const customerAcquisition = [
 ]
 
 export default function Analytics() {
+  const [statsData, setStatsData] = useState<SellerStats | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await getSellerStats("")
+        setStatsData(res)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const payStats = statsData?.paymentStats || {
+    totalPaidOrders: 0,
+    totalPendingPayments: 0,
+    revenueFromPaidOrders: 0,
+    codOrdersCount: 0,
+    upiOrdersCount: 0,
+    cardOrdersCount: 0,
+    walletOrdersCount: 0,
+  }
+
+  const paymentMethodsData = [
+    { name: "Cash on Delivery", value: payStats.codOrdersCount, color: "#F59E0B" },
+    { name: "UPI", value: payStats.upiOrdersCount, color: "#10B981" },
+    { name: "Card", value: payStats.cardOrdersCount, color: "#3B82F6" },
+    { name: "Urban Basket Wallet", value: payStats.walletOrdersCount, color: "#8B5CF6" },
+  ].filter(d => d.value > 0)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -72,7 +108,11 @@ export default function Analytics() {
                 <Icon className="w-4 h-4 text-primary-400" />
               </div>
               <div className="mt-4 flex items-end justify-between">
-                <p className="text-lg font-bold text-surface-100 tracking-tight">{stat.value}</p>
+                <p className="text-lg font-bold text-surface-100 tracking-tight">
+                  {stat.label === "Avg. Order Value" && statsData?.totalRevenue && statsData?.totalOrders
+                    ? formatCurrency(statsData.totalRevenue / statsData.totalOrders)
+                    : stat.value}
+                </p>
                 <span
                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                     stat.isPositive
@@ -88,8 +128,108 @@ export default function Analytics() {
         })}
       </div>
 
+      {/* Payment Analytics Section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="font-display font-bold text-lg text-surface-150">Payment Analytics</h2>
+          <p className="text-xs text-surface-400 mt-0.5">Real-time statistics of transaction channels, statuses, and revenue splits.</p>
+        </div>
+
+        {loading ? (
+          <div className="p-12 text-center rounded-2xl glass border border-surface-800/40">
+            <p className="text-sm text-surface-400">Loading payment analytics…</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-5 rounded-2xl glass border border-green-500/20 bg-green-500/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Total Paid Orders</span>
+                <p className="text-xl font-bold text-surface-100">{payStats.totalPaidOrders}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl glass border border-amber-500/20 bg-amber-500/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Total Pending Payments</span>
+                <p className="text-xl font-bold text-surface-100">{payStats.totalPendingPayments}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl glass border border-primary-500/20 bg-primary-500/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-[10px] text-primary-400 font-bold uppercase tracking-wider">Revenue from Paid Orders</span>
+                <p className="text-xl font-bold text-surface-100">{formatCurrency(payStats.revenueFromPaidOrders)}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Main Charts grid (2 cols desktop, 1 col mobile) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Payment Methods Split PieChart */}
+        <div className="rounded-2xl glass border border-surface-800/40 p-6 shadow-md space-y-4">
+          <div>
+            <h3 className="font-display font-semibold text-sm text-surface-150 flex items-center gap-1.5">
+              <CreditCard className="w-4 h-4 text-primary-400" />
+              Payment Methods Split
+            </h3>
+            <p className="text-[10px] text-surface-450 mt-0.5">Order distribution across selected payment gateways</p>
+          </div>
+          {loading ? (
+            <div className="h-64 flex items-center justify-center text-xs text-surface-450">
+              Loading split details…
+            </div>
+          ) : paymentMethodsData.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-xs text-surface-450">
+              No payment transactions recorded yet.
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col sm:flex-row items-center justify-center gap-6">
+              <div className="w-full sm:w-1/2 h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={paymentMethodsData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      {paymentMethodsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(20, 20, 25, 0.85)",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        borderRadius: "12px",
+                        color: "#F3F4F6",
+                        fontSize: "11px"
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-col gap-2 w-full sm:w-1/2">
+                {paymentMethodsData.map((entry) => (
+                  <div key={entry.name} className="flex items-center justify-between text-xs font-sans">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span className="text-surface-300 font-medium">{entry.name}</span>
+                    </div>
+                    <span className="font-semibold text-surface-200">{entry.value} Order{entry.value !== 1 ? 's' : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Revenue AreaChart */}
         <div className="rounded-2xl glass border border-surface-800/40 p-6 shadow-md space-y-4">
           <h3 className="font-display font-semibold text-sm text-surface-150 flex items-center gap-1.5">
@@ -189,29 +329,6 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Sales BarChart */}
-        <div className="rounded-2xl glass border border-surface-800/40 p-6 shadow-md space-y-4">
-          <h3 className="font-display font-semibold text-sm text-surface-150">Revenue Categories</h3>
-          <div className="h-64 pr-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryData}>
-                <XAxis dataKey="name" stroke="#6B7280" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#6B7280" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "rgba(20, 20, 25, 0.85)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "12px",
-                    color: "#F3F4F6",
-                    fontSize: "11px"
-                  }}
-                  formatter={(value: any) => [formatCurrency(value), "Sales"]}
-                />
-                <Bar dataKey="value" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
       </div>
     </motion.div>
   )

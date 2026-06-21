@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link, useNavigate } from "react-router"
 import { useAuthStore } from "@/store/authStore"
-import { createOrder, notifyOrdersUpdated } from "@/services/orderService"
+import { createOrder, notifyOrdersUpdated, type PaymentMethod, type PaymentStatus } from "@/services/orderService"
 import { validateCoupon, applyCoupon } from "@/services/couponService"
 import { motion, AnimatePresence } from "motion/react"
 import {
@@ -176,8 +176,8 @@ export default function Checkout() {
       return
     }
 
-    let payment_method: PaymentMethodId = selectedPayment
-    let payment_status: "paid" | "pending" = "paid"
+    let payment_method: PaymentMethod = "Card"
+    let payment_status: PaymentStatus = "Paid"
     let transaction_id: string | null = null
 
     if (selectedPayment === "wallet") {
@@ -185,20 +185,23 @@ export default function Checkout() {
         toast.error("Insufficient wallet balance. Add money or choose another payment method.")
         return
       }
+      payment_method = "Wallet"
     } else if (selectedPayment === "card") {
       const cardError = validateCardForm(cardForm)
       if (cardError) {
         toast.error(cardError)
         return
       }
+      payment_method = "Card"
     } else if (selectedPayment === "upi") {
       if (!upiId.trim() || upiId.trim().length < 3) {
         toast.error("Please enter your UPI ID")
         return
       }
-      payment_method = upiApp === "gpay" ? "gpay" : "upi"
+      payment_method = "UPI"
     } else if (selectedPayment === "cod") {
-      payment_status = "pending"
+      payment_method = "COD"
+      payment_status = "Pending"
     }
 
     setIsPlacingOrder(true)
@@ -229,7 +232,7 @@ export default function Checkout() {
           return
         }
         transaction_id = sim.transaction_id
-        payment_status = "paid"
+        payment_status = "Paid"
       }
 
       if (selectedPayment === "wallet") {

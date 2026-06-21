@@ -18,9 +18,14 @@ import {
   seedInitialTrackingHistory,
   statusToTrackingStep,
 } from "../services/orderTrackingService.js"
+import {
+  saveOrderPaymentInFile,
+  getOrderPaymentFromFile,
+  getAllOrderPaymentsFromFile,
+} from "../utils/orderPaymentsStore.js"
 
-const PAYMENT_METHODS = new Set(["wallet", "gpay", "upi", "card", "cod"])
-const PAYMENT_STATUSES = new Set(["paid", "pending", "failed"])
+const PAYMENT_METHODS = new Set(["Wallet", "gpay", "UPI", "Card", "COD", "wallet", "upi", "card", "cod"])
+const PAYMENT_STATUSES = new Set(["Paid", "Pending", "Failed", "paid", "pending", "failed"])
 
 export const createOrder = async (req, res, next) => {
   try {
@@ -28,8 +33,8 @@ export const createOrder = async (req, res, next) => {
       total,
       shipping_address,
       items,
-      payment_method = "card",
-      payment_status = "paid",
+      payment_method = "Card",
+      payment_status = "Paid",
       transaction_id = null,
     } = req.body
     const userId = req.user.id
@@ -46,30 +51,40 @@ export const createOrder = async (req, res, next) => {
       return res.status(400).json({ error: "Invalid payment status." })
     }
 
-    if (payment_status === "failed") {
+    if (payment_status.toLowerCase() === "failed") {
       return res.status(400).json({ error: "Payment failed. Please try again or choose another method." })
     }
 
+    // Normalize Payment Info
+    let normalizedMethod = "Card"
+    const lowerMethod = payment_method.toLowerCase()
+    if (lowerMethod === "cod") normalizedMethod = "COD"
+    else if (lowerMethod === "wallet") normalizedMethod = "Wallet"
+    else if (lowerMethod === "upi" || lowerMethod === "gpay") normalizedMethod = "UPI"
+
+    let normalizedStatus = "Paid"
+    if (normalizedMethod === "COD") {
+      normalizedStatus = "Pending"
+    }
+
+    let resolvedTransactionId = transaction_id
+    if (normalizedMethod === "COD") {
+      resolvedTransactionId = null
+    } else if (!resolvedTransactionId) {
+      resolvedTransactionId = `${normalizedMethod.toUpperCase()}_${Date.now()}`
+    }
+
+    const paidAt = normalizedStatus === "Paid" ? new Date().toISOString() : null
+
     const orderTotal = parseFloat(total)
 
-    if (payment_method === "wallet") {
-      if (payment_status !== "paid") {
-        return res.status(400).json({ error: "Wallet payments must be marked as paid." })
-      }
+    if (normalizedMethod === "Wallet") {
       const balance = await getWalletBalance(userId)
       if (balance < orderTotal) {
         return res.status(400).json({
           error: `Insufficient wallet balance. Available: ₹${balance.toFixed(2)}, required: ₹${orderTotal.toFixed(2)}`,
         })
       }
-    }
-
-    if (payment_method === "cod") {
-      if (payment_status !== "pending") {
-        return res.status(400).json({ error: "COD orders must have pending payment status." })
-      }
-    } else if (payment_status !== "paid") {
-      return res.status(400).json({ error: "Online payments must be completed before placing the order." })
     }
 
     // 1. Verify stock and calculate price accuracy (optional but recommended)
@@ -89,10 +104,6 @@ export const createOrder = async (req, res, next) => {
       }
     }
 
-    const resolvedTransactionId =
-      transaction_id ||
-      (payment_method === "cod" ? `COD_${Date.now()}` : null)
-
     const estimatedDelivery = computeEstimatedDelivery(new Date().toISOString())
 
     const orderPayload = {
@@ -102,23 +113,30 @@ export const createOrder = async (req, res, next) => {
       status: "pending",
       tracking_step: 0,
       estimated_delivery: estimatedDelivery,
-      payment_method,
-      payment_status,
+      payment_method: normalizedMethod,
+      payment_status: normalizedStatus,
       transaction_id: resolvedTransactionId,
+      paid_at: paidAt,
     }
 
     // 2. Insert order
     let orderResult = await supabaseAdmin.from("orders").insert(orderPayload).select("*").single()
 
+    let usedFallback = false
     if (
       orderResult.error?.message?.includes("payment_method") ||
+      orderResult.error?.message?.includes("payment_status") ||
+      orderResult.error?.message?.includes("transaction_id") ||
+      orderResult.error?.message?.includes("paid_at") ||
       orderResult.error?.message?.includes("estimated_delivery") ||
       orderResult.error?.message?.includes("tracking_step")
     ) {
+      usedFallback = true
       const {
         payment_method: _pm,
         payment_status: _ps,
         transaction_id: _tx,
+        paid_at: _pa,
         estimated_delivery: _ed,
         tracking_step: _ts,
         ...legacyPayload
@@ -130,6 +148,16 @@ export const createOrder = async (req, res, next) => {
 
     if (orderError) {
       return res.status(400).json({ error: orderError.message })
+    }
+
+    // Save details to file fallback if database columns are missing
+    if (usedFallback) {
+      await saveOrderPaymentInFile(order.id, {
+        payment_method: normalizedMethod,
+        payment_status: normalizedStatus,
+        transaction_id: resolvedTransactionId,
+        paid_at: paidAt,
+      })
     }
 
     // 3. Insert order items and decrease stock
@@ -175,7 +203,7 @@ export const createOrder = async (req, res, next) => {
       }
     }
 
-    if (payment_method === "wallet" && payment_status === "paid") {
+    if (normalizedMethod === "Wallet" && normalizedStatus === "Paid") {
       try {
         await deductWallet(userId, orderTotal, `order_${order.id}`)
       } catch (walletErr) {
@@ -194,11 +222,12 @@ export const createOrder = async (req, res, next) => {
 
     await seedInitialTrackingHistory(order.id, "pending", userId).catch(() => {})
 
-    return res.status(201).json(enrichOrderPaymentInfo({
+    return res.status(201).json(await enrichOrderPaymentInfoAsync({
       ...order,
-      payment_method: order.payment_method || payment_method,
-      payment_status: order.payment_status || payment_status,
+      payment_method: order.payment_method || normalizedMethod,
+      payment_status: order.payment_status || normalizedStatus,
       transaction_id: order.transaction_id || resolvedTransactionId,
+      paid_at: order.paid_at || paidAt,
     }))
   } catch (err) {
     next(err)
@@ -231,10 +260,11 @@ export const getUserOrders = async (req, res, next) => {
     }
 
     const returnedIds = await getReturnedOrderIdSet().catch(() => new Set())
-    const enriched = (orders || []).map((o) => {
+    const allPayments = await getAllOrderPaymentsFromFile().catch(() => ({}))
+    const enriched = await Promise.all((orders || []).map(async (o) => {
       const withReturn = applyReturnedOverlay(o, returnedIds)
-      return enrichOrderPaymentInfo(withReturn)
-    })
+      return await enrichOrderPaymentInfoAsync(withReturn, allPayments)
+    }))
 
     return res.status(200).json(enriched)
   } catch (err) {
@@ -282,14 +312,16 @@ export const getSellerOrders = async (req, res, next) => {
 
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select("id, total, status, created_at, user_id, shipping_address")
+      .select("id, total, status, created_at, user_id, shipping_address, payment_method, payment_status, transaction_id, paid_at")
       .in("id", orderIds)
 
     if (ordersError) {
       return res.status(400).json({ error: ordersError.message })
     }
 
-    const orderMap = new Map((orders || []).map((o) => [o.id, o]))
+    const allPayments = await getAllOrderPaymentsFromFile().catch(() => ({}))
+    const enrichedOrders = await Promise.all((orders || []).map(o => enrichOrderPaymentInfoAsync(o, allPayments)))
+    const orderMap = new Map(enrichedOrders.map((o) => [o.id, o]))
 
     const userIds = [...new Set((orders || []).map((o) => o.user_id).filter(Boolean))]
     const profileMap = new Map()
@@ -332,6 +364,10 @@ export const getSellerOrders = async (req, res, next) => {
           total: 0,
           status: order.status || "pending",
           date: order.created_at || new Date().toISOString(),
+          payment_method: order.payment_method,
+          payment_status: order.payment_status,
+          transaction_id: order.transaction_id,
+          paid_at: order.paid_at,
         })
       }
 
@@ -429,11 +465,19 @@ export const updateOrderStatus = async (req, res, next) => {
       return res.status(400).json({ error: "Returned orders cannot be updated." })
     }
 
+    const enrichedExisting = await enrichOrderPaymentInfoAsync(existingOrder)
+
     const updatePayload = {
       status,
       tracking_step: statusToTrackingStep(status),
       ...buildStatusTimestamps(status, existingOrder),
     }
+
+    if (status === "delivered" && enrichedExisting.payment_method === "COD") {
+      updatePayload.payment_status = "Paid"
+      updatePayload.paid_at = new Date().toISOString()
+    }
+
     const schema = await detectOrderReturnSchema()
     if (
       schema.hasReturnColumns &&
@@ -454,16 +498,36 @@ export const updateOrderStatus = async (req, res, next) => {
     if (
       error?.message?.includes("delivered_at") ||
       error?.message?.includes("tracking_step") ||
-      error?.message?.includes("shipped_at")
+      error?.message?.includes("shipped_at") ||
+      error?.message?.includes("payment_status") ||
+      error?.message?.includes("paid_at")
     ) {
+      const {
+        payment_status: _ps,
+        paid_at: _pa,
+        delivered_at: _da,
+        tracking_step: _ts,
+        shipped_at: _sa,
+        ...fallbackPayload
+      } = updatePayload
+
       const fallback = await supabaseAdmin
         .from("orders")
-        .update({ status })
+        .update(fallbackPayload)
         .eq("id", id)
         .select("*")
         .single()
       order = fallback.data
       error = fallback.error
+
+      if (status === "delivered" && enrichedExisting.payment_method === "COD") {
+        await saveOrderPaymentInFile(id, {
+          payment_method: "COD",
+          payment_status: "Paid",
+          transaction_id: null,
+          paid_at: new Date().toISOString(),
+        })
+      }
     }
 
     if (error) {
@@ -564,34 +628,75 @@ export function enrichOrderPaymentInfo(order) {
   if (!order) return order
 
   let method = order.payment_method
-  if (!method && order.transaction_id) {
-    if (order.transaction_id.startsWith("COD_")) {
-      method = "cod"
-    } else if (order.transaction_id.startsWith("WALLET_")) {
-      method = "wallet"
-    } else if (order.transaction_id.startsWith("GPAY_") || order.transaction_id.includes("GPAY")) {
-      method = "gpay"
-    } else if (order.transaction_id.startsWith("UPI_") || order.transaction_id.includes("UPI")) {
-      method = "upi"
-    } else {
-      method = "card"
-    }
-  }
-  if (!method) method = "card"
-
   let payStatus = order.payment_status
-  if (!payStatus) {
-    if (method === "cod") {
-      payStatus = order.status === "delivered" ? "paid" : "pending"
+  let txId = order.transaction_id
+
+  if (!method) {
+    if (txId) {
+      if (txId.startsWith("COD_")) method = "COD"
+      else if (txId.startsWith("WALLET_")) method = "Wallet"
+      else if (txId.startsWith("GPAY_") || txId.includes("GPAY")) method = "UPI"
+      else if (txId.startsWith("UPI_") || txId.includes("UPI")) method = "UPI"
+      else method = "Card"
     } else {
-      payStatus = "paid"
+      method = "Card"
     }
   }
+
+  if (!payStatus) {
+    if (method === "COD") {
+      payStatus = order.status === "delivered" ? "Paid" : "Pending"
+    } else {
+      payStatus = "Paid"
+    }
+  }
+
+  // Capitalization check
+  if (method === "cod") method = "COD"
+  if (method === "card") method = "Card"
+  if (method === "upi") method = "UPI"
+  if (method === "wallet") method = "Wallet"
+
+  if (payStatus === "pending") payStatus = "Pending"
+  if (payStatus === "paid") payStatus = "Paid"
 
   return {
     ...order,
     payment_method: method,
     payment_status: payStatus,
+  }
+}
+
+export async function enrichOrderPaymentInfoAsync(order, allPayments = null) {
+  if (!order) return order
+
+  let method = order.payment_method
+  let payStatus = order.payment_status
+  let txId = order.transaction_id
+  let paidAt = order.paid_at
+
+  if (method === undefined || method === null) {
+    const paymentInfo = allPayments 
+      ? allPayments[String(order.id)] 
+      : await getOrderPaymentFromFile(order.id).catch(() => null)
+    if (paymentInfo) {
+      method = paymentInfo.payment_method
+      payStatus = paymentInfo.payment_status
+      txId = paymentInfo.transaction_id
+      paidAt = paymentInfo.paid_at
+    }
+  }
+
+  const enriched = enrichOrderPaymentInfo({
+    ...order,
+    payment_method: method,
+    payment_status: payStatus,
+    transaction_id: txId,
+  })
+
+  return {
+    ...enriched,
+    paid_at: paidAt,
   }
 }
 

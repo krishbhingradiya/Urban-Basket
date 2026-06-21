@@ -49,16 +49,21 @@ interface Order {
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  wallet: "Urban-Basket Wallet",
+  wallet: "Urban Basket Wallet",
   gpay: "Google Pay",
   upi: "UPI",
   card: "Card",
   cod: "Cash on Delivery",
+  Wallet: "Urban Basket Wallet",
+  Card: "Card",
+  UPI: "UPI",
+  COD: "Cash on Delivery",
 }
 
 const PAYMENT_STATUS_COLORS: Record<string, string> = {
   paid: "text-green-400 bg-green-400/10 border-green-500/20",
   pending: "text-amber-400 bg-amber-400/10 border-amber-500/20",
+  "payment pending": "text-amber-400 bg-amber-400/10 border-amber-500/20",
   failed: "text-red-400 bg-red-400/10 border-red-500/20",
 }
 
@@ -88,8 +93,8 @@ const VALID_STATUSES = new Set<string>([
 
 function mapApiOrder(order: OrderWithItems): Order {
   const status = VALID_STATUSES.has(order.status) ? (order.status as Order["status"]) : "pending"
-  const method = order.payment_method || "card"
-  const payStatus = order.payment_status || (method === "cod" ? "pending" : "paid")
+  const method = order.payment_method || "Card"
+  const payStatus = order.payment_status || (method.toLowerCase() === "cod" ? "Pending" : "Paid")
   return {
     id: order.id,
     date: order.created_at,
@@ -98,7 +103,7 @@ function mapApiOrder(order: OrderWithItems): Order {
     deliveredAt: order.delivered_at || null,
     estimatedDelivery: order.estimated_delivery || null,
     paymentMethod: PAYMENT_METHOD_LABELS[method] || method,
-    paymentStatus: payStatus === "pending" || (method === "cod" && payStatus !== "paid" && status !== "delivered") ? "Pending" : "Paid",
+    paymentStatus: payStatus.toLowerCase() === "pending" || (method.toLowerCase() === "cod" && payStatus.toLowerCase() !== "paid" && status !== "delivered") ? "Payment Pending" : "Paid",
     shippingAddress:
       order.shipping_address && typeof order.shipping_address === "object"
         ? (order.shipping_address as ShippingAddressLike)
@@ -300,7 +305,7 @@ export default function Orders() {
                               className={`font-semibold uppercase ${
                                 order.paymentStatus.toLowerCase() === "paid"
                                   ? "text-green-400"
-                                  : order.paymentStatus.toLowerCase() === "pending"
+                                  : order.paymentStatus.toLowerCase() === "payment pending" || order.paymentStatus.toLowerCase() === "pending"
                                   ? "text-amber-400"
                                   : "text-surface-300"
                               }`}

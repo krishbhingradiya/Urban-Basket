@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiPut } from "./api"
 
-export type PaymentMethod = "wallet" | "gpay" | "upi" | "card" | "cod"
-export type PaymentStatus = "paid" | "pending" | "failed"
+export type PaymentMethod = "wallet" | "gpay" | "upi" | "card" | "cod" | "Wallet" | "UPI" | "Card" | "COD"
+export type PaymentStatus = "paid" | "pending" | "failed" | "Paid" | "Pending" | "Failed"
 
 export interface Order {
   id: string
