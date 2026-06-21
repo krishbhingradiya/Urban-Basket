@@ -24,6 +24,14 @@ import NotFound from "@/pages/NotFound"
 import Categories from "@/pages/Categories"
 import Deals from "@/pages/Deals"
 
+// Info Pages
+import AboutPage from "@/pages/info/AboutPage"
+import CareersPage from "@/pages/info/CareersPage"
+import BlogPage from "@/pages/info/BlogPage"
+import PartnersPage from "@/pages/info/PartnersPage"
+import PrivacyPage from "@/pages/info/PrivacyPage"
+import TermsPage from "@/pages/info/TermsPage"
+
 // Seller Pages
 import SellerDashboard from "@/pages/seller/Dashboard"
 import SellerProducts from "@/pages/seller/Products"
@@ -65,8 +73,13 @@ export function AppRouter() {
           <Route path="/deals" element={<Deals />} />
           <Route path="/mystery" element={<MysteryBoxesPage />} />
           <Route path="/product/:id" element={<ProductDetail />} />
-          
-          {/* Protected Customer Routes */}
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/careers" element={<CareersPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+                    {/* Protected Customer Routes */}
           <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/orders" element={<Orders />} />
