@@ -3,6 +3,7 @@ import { Toaster } from "sonner"
 import CustomerLayout from "@/layouts/CustomerLayout"
 import SellerLayout from "@/layouts/SellerLayout"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import ScrollToTop from "@/components/common/ScrollToTop"
 
 // Customer Pages
 import Landing from "@/pages/Landing"
@@ -47,6 +48,7 @@ import CouponManagement from "@/pages/seller/CouponManagement"
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Toaster
         position="top-right"
         toastOptions={{
