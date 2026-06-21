@@ -25,9 +25,22 @@ const app = express()
 const PORT = process.env.PORT || 5000
 
 // Configure CORS - allow frontend origin
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://urban-basket-six.vercel.app",
+]
+
+if (process.env.FRONTEND_URL) {
+  const url = process.env.FRONTEND_URL.trim().replace(/\/$/, "")
+  if (url && !allowedOrigins.includes(url)) {
+    allowedOrigins.push(url)
+  }
+}
+
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: allowedOrigins,
     credentials: true,
   })
 )

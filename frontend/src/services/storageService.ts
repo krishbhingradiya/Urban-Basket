@@ -1,12 +1,10 @@
 import { supabase } from "@/supabase/client"
-import { getToken } from "./api"
+import { getToken, API_URL } from "./api"
 
 export async function uploadProductImage(file: File, sellerId: string): Promise<string> {
   const token = getToken()
   const formData = new FormData()
   formData.append("file", file)
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
   const res = await fetch(`${API_URL}/products/upload`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},

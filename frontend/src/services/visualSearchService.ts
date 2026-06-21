@@ -1,7 +1,5 @@
-import { getToken } from "./api"
+import { getToken, API_URL } from "./api"
 import type { Product } from "./productService"
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
 export interface VisualSearchHintsPayload {
   labels?: Array<{ className: string; probability: number }>

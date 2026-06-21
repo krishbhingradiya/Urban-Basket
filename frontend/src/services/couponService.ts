@@ -1,24 +1,4 @@
-import { apiGet, apiPost, apiDelete } from "./api"
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-
-function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("ub-token")
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
-async function apiPatch<T = any>(path: string, body?: any): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || err.message || "Request failed")
-  }
-  return res.json()
-}
+import { apiGet, apiPost, apiDelete, apiPatch, API_URL } from "./api"
 
 export interface Coupon {
   id: string
