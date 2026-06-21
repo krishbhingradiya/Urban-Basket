@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router"
+import { Toaster } from "sonner"
 import CustomerLayout from "@/layouts/CustomerLayout"
 import SellerLayout from "@/layouts/SellerLayout"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
@@ -38,6 +39,18 @@ import CouponManagement from "@/pages/seller/CouponManagement"
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "rgba(20, 20, 25, 0.8)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            color: "#F3F4F6",
+            backdropFilter: "blur(12px)",
+          },
+          className: "glass"
+        }}
+      />
       <Routes>
         {/* Auth pages */}
         <Route path="/login" element={<Login />} />

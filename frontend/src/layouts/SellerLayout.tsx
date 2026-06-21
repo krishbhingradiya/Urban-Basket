@@ -26,8 +26,6 @@ import { useThemeStore } from "@/store/themeStore"
 import { useNotificationStore } from "@/store/notificationStore"
 import { useNotificationSync } from "@/hooks/useNotificationSync"
 import { RealtimeSellerOrdersSync } from "@/components/orders/RealtimeSellerOrdersSync"
-import { Toaster } from "sonner"
-
 const sidebarLinks = [
   { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/seller/products", label: "My Products", icon: Package },
@@ -378,18 +376,6 @@ export default function SellerLayout() {
         )}
       </AnimatePresence>
 
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "rgba(20, 20, 25, 0.8)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            color: "#F3F4F6",
-            backdropFilter: "blur(12px)"
-          },
-          className: "glass"
-        }}
-      />
     </div>
   )
 }
